@@ -3,7 +3,6 @@
 **Clean. Fast. Lightweight.**
 
 GW IDE is a minimalist, extensible desktop IDE Built with PySide6.
-And will be made compatible to GWGE(golden wings game engine)
 
 > Because less is more when you want speed.
 
