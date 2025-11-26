@@ -30,9 +30,9 @@ class GW(QMainWindow):
     def __init__(self):
 
         super().__init__()
-        QCoreApplication.setApplicationName("CFL IDE") # Added QCoreApplication setup
+        QCoreApplication.setApplicationName("GW IDE") # Added QCoreApplication setup
 
-        self.setWindowTitle("GW IDE - Beta Edition")
+        self.setWindowTitle("GW IDE - BETA EDITION - v1.0.1.5")
         self.setGeometry(100, 100, 1400, 900) 
         self.settings = load_settings()
         self.autosave_enabled = self.settings.get("autosave", False)

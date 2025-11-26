@@ -47,7 +47,7 @@ class SplashScreen(QWidget):
         """Sets up the UI elements and styling for the splash screen."""
         self.setStyleSheet("""
             QWidget {
-                background-color: white; /* Dark background similar to IDE theme */
+                background-color: #2C2D2D; /* Dark background similar to IDE theme */
                 border-radius: 15px;
             }
             QLabel#title_label {
@@ -72,7 +72,7 @@ class SplashScreen(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
 
         # Title Label
-        title_label = QLabel("GWide v1.0.1 BETA")
+        title_label = QLabel("GW IDE v1.0.1 BETA")
         title_label.setObjectName("title_label")
         title_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(title_label)

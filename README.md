@@ -1,4 +1,4 @@
-# GW ide
+# GW IDE
 
 Clean. Fast. Lightweight.
 
