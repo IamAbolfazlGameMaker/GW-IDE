@@ -13,6 +13,158 @@ from PySide6.QtCore import (
 )
 
 # ------------------------------------------------------------------
+# 🎨 SYNTAX HIGHLIGHTING: COLOR SCHEME & FORMATS
+# ------------------------------------------------------------------
+
+# Define a color scheme (VS Code Dark+ inspired)
+COLORS = {
+    'background': "#1E1E1E",
+    'foreground': "#D4D4D4",
+    'comment': "#6A9955",
+    'keyword': "#569CD6", # Blue
+    'operator': "#C586C0", # Purple
+    'string': "#CE9178", # Orange/Brown
+    'numbers': "#B5CEA8", # Green/Yellow
+    'function': "#DCDCAA", # Yellow
+    'class': "#4EC9B0", # Light Blue/Teal
+}
+
+def get_format(color_key, font_weight=None):
+    """Utility to create a QTextCharFormat."""
+    _format = QTextCharFormat()
+    _format.setForeground(QColor(COLORS[color_key]))
+    if font_weight is not None:
+        _format.setFontWeight(font_weight)
+    return _format
+
+# Define the actual formats
+FORMATS = {
+    'keyword': get_format('keyword', QFont.Bold),
+    'operator': get_format('operator'),
+    'string': get_format('string'),
+    'comment': get_format('comment'),
+    'numbers': get_format('numbers'),
+    'function': get_format('function'),
+    'class': get_format('class', QFont.Bold),
+}
+
+# ------------------------------------------------------------------
+# 🎨 SYNTAX HIGHLIGHTING: PythonHighlighter Class
+# ------------------------------------------------------------------
+
+class PythonHighlighter(QSyntaxHighlighter):
+    """A basic QSyntaxHighlighter for Python code."""
+    
+    # 1. Define the keyword/rule lists
+    KEYWORDS = [
+        'and', 'as', 'assert', 'break', 'class', 'continue', 'def', 
+        'del', 'elif', 'else', 'except', 'finally', 'for', 'from', 
+        'global', 'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 
+        'not', 'or', 'pass', 'raise', 'return', 'try', 'while', 'with', 
+        'yield', 'True', 'False', 'None'
+    ]
+    
+    OPERATORS = [
+        '=', '==', '!=', '<', '<=', '>', '>=', '\\+', '-', '\\*', '/', 
+        '//', '%', '\\*\\*', '\\+=', '-=', '\\*=', '/=', '%='
+    ]
+    
+    # 2. Setup rules (order matters for complex regex)
+    RULES = []
+
+    # Rule 1: Comments (must be first)
+    # The '?' makes the matching non-greedy, stopping at the first EOL
+    RULES.append((QRegularExpression("#[^\n]*"), FORMATS['comment'])) 
+
+    # Rule 2: Keywords
+    # Use word boundaries (\b) to match whole words only
+    for keyword in KEYWORDS:
+        # \b is a word boundary; e.g. it matches 'if' but not 'elif' or 'identifierif'
+        RULES.append((QRegularExpression(f"\\b{keyword}\\b"), FORMATS['keyword']))
+
+    # Rule 3: Operators
+    for operator in OPERATORS:
+        RULES.append((QRegularExpression(operator), FORMATS['operator']))
+
+    # Rule 4: Numbers (integers, floats)
+    RULES.append((QRegularExpression("\\b[0-9]+(\\.[0-9]+)?\\b"), FORMATS['numbers']))
+
+    # Rule 5: Function Definition (def identifier)
+    RULES.append((QRegularExpression("\\bdef\\s+(\\w+)\\b"), FORMATS['function']))
+    
+    # Rule 6: Class Definition (class identifier)
+    RULES.append((QRegularExpression("\\bclass\\s+(\\w+)\\b"), FORMATS['class']))
+
+    # Rules for multi-line block (string literals - handled in highlightBlock)
+    STRING_RULE = (QRegularExpression('".*?"'), FORMATS['string'])
+    
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.rules = self.RULES + [self.STRING_RULE]
+        self.multiline_string_format = FORMATS['string']
+        # State for multi-line string: 1 = inside single quotes, 2 = inside double quotes
+        # We only use state 1 for simplicity (triple-double-quotes)
+        self.tri_double_quote_regex = QRegularExpression('"""')
+
+    def highlightBlock(self, text):
+        """Applies highlighting to a single block of text (line)."""
+        
+        # Apply standard single-line rules first
+        for pattern, format in self.rules:
+            it = pattern.globalMatch(text)
+            while it.hasNext():
+                match = it.next()
+                
+                # Check for function/class capture group (Rule 5 & 6)
+                if match.captured(1):
+                    # Highlight the actual identifier, not the 'def ' or 'class ' part
+                    self.setFormat(match.capturedStart(1), match.capturedLength(1), format)
+                else:
+                    self.setFormat(match.capturedStart(), match.capturedLength(), format)
+        
+        # Handle multi-line strings (triple quotes)
+        # This is a complex logic simplified for demonstration
+        
+        # 1. Initial state from previous block (if any)
+        self.setCurrentBlockState(0) 
+        
+        start_index = 0
+        
+        # If we were *in* a multi-line string from the previous block
+        if self.previousBlockState() == 1:
+            start_index = 0
+            
+            # Look for the closing '"""'
+            match = self.tri_double_quote_regex.match(text, start_index)
+            if match.hasMatch():
+                # Found end: format from start_index to end
+                self.setFormat(start_index, match.capturedEnd() - start_index, self.multiline_string_format)
+            else:
+                # Still inside: format the whole line
+                self.setFormat(start_index, len(text), self.multiline_string_format)
+                self.setCurrentBlockState(1) # Continue to next line
+                
+        # 2. Look for the start of a multi-line string
+        while True:
+            # Find the starting '"""'
+            match_start = self.tri_double_quote_regex.match(text, start_index)
+            if not match_start.hasMatch():
+                break # No more multi-line strings on this line
+            
+            # Found a starting '"""'
+            match_end = self.tri_double_quote_regex.match(text, match_start.capturedEnd())
+            
+            if match_end.hasMatch():
+                # End is on the same line: format the whole string and continue search
+                self.setFormat(match_start.capturedStart(), match_end.capturedEnd() - match_start.capturedStart(), self.multiline_string_format)
+                start_index = match_end.capturedEnd()
+            else:
+                # End is on a later line: format from start to end of line
+                self.setCurrentBlockState(1) # Set state to 'inside multi-line string'
+                self.setFormat(match_start.capturedStart(), len(text) - match_start.capturedStart(), self.multiline_string_format)
+                break # Stop processing this line
+
+# ------------------------------------------------------------------
 # 🚨 LINE NUMBER AREA WIDGET 
 # ------------------------------------------------------------------
 
@@ -53,6 +205,12 @@ class CodeEditorCore(QPlainTextEdit):
         self.setFont(font)
         self.setLineWrapMode(QPlainTextEdit.NoWrap)
         self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(' '))
+
+        # --- 🎨 SYNTAX HIGHLIGHTING: Integration START ---
+        self.setStyleSheet(f"QPlainTextEdit {{ background-color: {COLORS['background']}; color: {COLORS['foreground']}; border: 1px solid #1E1E1E; }}")
+        # Instantiate and set the highlighter
+        self.highlighter = PythonHighlighter(self.document())
+        # --- 🎨 SYNTAX HIGHLIGHTING: Integration END ---
 
         # 🚨 LINE NUMBER IMPLEMENTATION START
         self.lineNumberArea = LineNumberArea(self)
@@ -106,7 +264,7 @@ class CodeEditorCore(QPlainTextEdit):
         while max_value >= 10:
             max_value /= 10
             digits += 1
-        
+            
         # space = 3px padding + font width * digits + 8px right margin
         space = 3 + self.fontMetrics().horizontalAdvance('0') * digits + 8
         return space
@@ -132,7 +290,8 @@ class CodeEditorCore(QPlainTextEdit):
         painter = QPainter(self.lineNumberArea)
         
         # --- 🎨 Styling ---
-        painter.fillRect(event.rect(), QColor("#282c34")) # Background
+        # Changed to match the dark theme background
+        painter.fillRect(event.rect(), QColor(COLORS['background'])) 
         painter.setPen(QColor("#5c6370")) # Text color for numbers
         painter.setFont(self.font())
         # --- 🎨 Styling End ---
@@ -226,6 +385,10 @@ class CodeEditorCore(QPlainTextEdit):
             self._title = QFileInfo(path).fileName()
             self.document().setModified(False)
             self.document_title_changed.emit(self.get_tab_title())
+            
+            # Re-highlight the document after loading new content
+            self.highlighter.rehighlight()
+            
             return True
         except Exception as e:
             QMessageBox.critical(self, "Read Error", f"An unexpected error occurred during load: {e}")
@@ -234,6 +397,7 @@ class CodeEditorCore(QPlainTextEdit):
 # ------------------------------------------------------------------
 # 🚨 EDITOR (QTabWidget wrapper, REQUIRED FOR MAIN WINDOW)
 # ------------------------------------------------------------------
+# (The Editor class remains unchanged as the core logic is in CodeEditorCore)
 
 class Editor(QTabWidget):
     document_title_changed = Signal(str)

@@ -28,29 +28,38 @@ class GW(QMainWindow):
 
 
     def __init__(self):
-
         super().__init__()
-        QCoreApplication.setApplicationName("GW IDE") # Added QCoreApplication setup
+        QCoreApplication.setApplicationName("GW IDE")
 
         self.setWindowTitle("GW IDE - BETA EDITION - v1.0.1.5")
         self.setGeometry(100, 100, 1400, 900) 
         self.settings = load_settings()
         self.autosave_enabled = self.settings.get("autosave", False)
-        self.current_project_name = None # Added for window title update
-        self._sidebar_sizes = [280, 1120] # Added for sidebar toggle
+        self.current_project_name = None 
+        
+        # Horizontal Splitter (File Manager | Editor) sizes
+        self._sidebar_sizes = [280, 1120]
+        
+        # Vertical Splitter (Top Area | Terminal) sizes (e.g., 85% top, 15% bottom based on 900 height)
+        self._main_splitter_sizes = [900, 50]
+        
         self.init_ui()
         self.apply_theme(self.settings.get("theme", "dark"))
 
-
-
         # Autosave timer
-
         self.autosave_timer = QTimer(self)
         self.autosave_timer.timeout.connect(self.autosave)
         self.autosave_timer.start(30000)
     
         self.fullscreen = False
         self.show_startup_alert()
+
+    def show_startup_alert(self):
+        QMessageBox.information(
+            self,
+            "WARNING!",
+            "if something goes wrong, Please read the README in GitHub."
+        )
 
         
 
@@ -127,7 +136,7 @@ class GW(QMainWindow):
 
         # Terminal setup
         self.terminal = TerminalWidget()
-        self.terminal.setFixedHeight(250) 
+        self.terminal.setFixedHeight(173) 
 
 
 
@@ -163,6 +172,8 @@ class GW(QMainWindow):
         self.init_menu_bar()
         self.init_toolbar()
         self.init_status_bar()
+        self.editor.currentChanged.connect(self._connect_active_editor_signals) 
+        self._connect_active_editor_signals(0) # Initial connection
 
         
 
@@ -184,7 +195,35 @@ class GW(QMainWindow):
     
 
     # 🎨 Menu Bar 
-
+    def _connect_active_editor_signals(self, index):
+        """Connects the active CodeEditorCore's signals to the GW methods."""
+        editor = self.editor.get_current_editor()
+        
+        # Disconnect previous connections if any, to prevent multiple updates
+        if hasattr(self, '_active_editor') and self._active_editor is not None:
+            try:
+                self._active_editor.cursorPositionChanged.disconnect(self.update_line_status)
+            except (TypeError, RuntimeError):
+                pass
+        
+        if editor:
+            # Store the current editor reference
+            self._active_editor = editor
+            
+            # Connect the active editor's signals
+            editor.cursorPositionChanged.connect(self.update_line_status)
+            self.update_line_status() # Initial update for the newly activated tab
+            
+            # Update language label (basic file extension check)
+            path = editor.get_file_path()
+            if path and path.endswith(".py"):
+                self.lang_label.setText("Language: Python")
+            else:
+                self.lang_label.setText("Language: Text")
+        else:
+            self._active_editor = None
+            self.line_status_label.setText("Ln -, Col -")
+            self.lang_label.setText("Language: Auto")
     def init_menu_bar(self):
         menu_bar = QMenuBar()
     
