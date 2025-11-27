@@ -19,7 +19,7 @@ from PySide6.QtCore import (
     Qt, QTimer, Signal, QCoreApplication, QFileInfo, QDir,
     QRunnable, QThreadPool, QObject, Slot, QUrl
 )
-
+import ctypes
 # --- CONFIGURATION (Moved from original updater script) ---
 CURRENT_VERSION = "1.0.2.1"
 PACKAGE_JSON_URL = "https://raw.githubusercontent.com/IamAbolfazlGameMaker/GW-IDE/refs/heads/main/packages.json"
@@ -28,7 +28,7 @@ UPDATE_TEMP_DIR = "temp_update_download"
 UPDATE_TARGET_DIR = os.getcwd()
 # -----------------------------------------------------------
 
-# --- Core Logic Imports (Ensure these files exist) ---
+# --- Core Logic Imports (DO NOT REMOVE AT ANY Given MOMENT) ---
 # NOTE: These imports are necessary for the provided structure to function.
 from core.settings import load_theme, load_settings, save_settings
 from core.editor import Editor 
@@ -37,9 +37,7 @@ from core.terminal import TerminalWidget
 from core.settings_ui import SettingsUI 
 # -----------------------------------------------------
 
-
 # --- 🛠️ UPDATE WORKER (Runs in a separate thread) ---
-
 class UpdateWorkerSignals(QObject):
     """Signals available from background worker thread."""
     result = Signal(bool, str) # Success/Failure, Message
