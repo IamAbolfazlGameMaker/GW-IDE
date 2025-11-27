@@ -18,7 +18,14 @@ how to setup source code:
 - getpass
 - requests
 - packaging
-
+---
+### How To Use THE setup.exe
+- make sure you have python installed (below 3.11 is strongly not recommended)
+- run setup.exe(from the latest version)
+- if a cmd pops-up at the end don't panic its installing deps
+- when complete run the app
+- when it requests admin perms don't panic its required for saving files in protected areas
+- there is always a debug powershell page so if you run into any problems give us the powershell log
 ---
 
 ## License – Restricted Use License (RUL)
