@@ -116,25 +116,43 @@ class UpdateWorker(QRunnable):
             self.signals.result.emit(False, f"Local version {CURRENT_VERSION} is up-to-date.")
 
     def _perform_update(self, remote_version):
-        """Downloads and extracts the update."""
+        """Downloads and extracts the update, now with progress reporting."""
         self.signals.progress.emit(f"Downloading source code for version {remote_version}...")
         try:
-            # 1. Download the zip file
+            # 1. Download the zip file (stream=True for chunking)
             zip_response = requests.get(SOURCE_CODE_ZIP_URL, stream=True, timeout=60)
             zip_response.raise_for_status()
             
-            # 2. Use io.BytesIO to handle the file in memory
-            zip_file_bytes = io.BytesIO(zip_response.content)
+            # Get total size for progress calculation (defaults to 0 if header is missing)
+            total_size = int(zip_response.headers.get('content-length', 0))
+            bytes_downloaded = 0
+            zip_buffer = io.BytesIO()
+            
+            # 2. Read in chunks and update progress
+            for chunk in zip_response.iter_content(chunk_size=8192):
+                if chunk: # filter out keep-alive chunks
+                    zip_buffer.write(chunk)
+                    bytes_downloaded += len(chunk)
+                    
+                    # Calculate and report progress
+                    if total_size > 0:
+                        percent = int((bytes_downloaded / total_size) * 100)
+                        self.signals.progress.emit(f"Downloading: {bytes_downloaded / (1024*1024):.1f} MB of {total_size / (1024*1024):.1f} MB ({percent}%)")
+                    else:
+                        self.signals.progress.emit(f"Downloading: {bytes_downloaded / (1024*1024):.1f} MB (Progress unknown)")
 
+            # Move buffer cursor to the start for ZipFile reading
+            zip_buffer.seek(0)
+            
             # 3. Create and clean temporary directory
             self.signals.progress.emit("Preparing file system...")
             if os.path.exists(UPDATE_TEMP_DIR):
                 shutil.rmtree(UPDATE_TEMP_DIR) 
             os.makedirs(UPDATE_TEMP_DIR, exist_ok=True)
 
-            # 4. Extract the zip file contents
+            # 4. Extract the zip file contents using the in-memory buffer
             self.signals.progress.emit("Extracting new files...")
-            with zipfile.ZipFile(zip_file_bytes, 'r') as zf:
+            with zipfile.ZipFile(zip_buffer, 'r') as zf:
                 root_dir = zf.namelist()[0].split('/')[0] + '/'
                 for member in zf.namelist():
                     if member.startswith(root_dir) and len(member) > len(root_dir):
