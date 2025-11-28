@@ -1,0 +1,6 @@
+[2025-11-28 23:52:03] Debug module loaded! Running in DEBUG mode.
+[2025-11-28 23:52:03] Loading splash HTML: E:\projects\GWide\splash.html
+[2025-11-28 23:52:13] Launching main app silently (DEBUG mode): E:\projects\GWide\app.py
+[2025-11-28 23:52:13] BASE_DIR= E:\projects\GWide\core
+[2025-11-28 23:52:13] USER_DATA_DIR= E:\projects\GWide\core\user_data
+[2025-11-28 23:52:13] THEMES_DIR= E:\projects\GWide\core\user_data\themes
