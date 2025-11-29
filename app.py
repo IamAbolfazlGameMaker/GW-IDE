@@ -11,7 +11,8 @@ from packaging.version import parse as parse_version
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QSplitter, QToolBar,
     QMessageBox, QCheckBox, QComboBox, QStatusBar, QMenu, QMenuBar, QLabel,
-    QFileDialog, QDialog, QPushButton, QGridLayout, QProgressBar, QSizePolicy
+    QFileDialog, QDialog, QPushButton, QGridLayout, QProgressBar, QSizePolicy,
+    QInputDialog # Added QInputDialog for file renaming
 )
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtWidgets import QStyle
@@ -21,7 +22,7 @@ from PySide6.QtCore import (
 )
 import ctypes
 # --- CONFIGURATION (Moved from original updater script) ---
-CURRENT_VERSION = "1.0.2.3"
+CURRENT_VERSION = "1.0.2.4"
 PACKAGE_JSON_URL = "https://raw.githubusercontent.com/IamAbolfazlGameMaker/GW-IDE/refs/heads/main/packages.json"
 SOURCE_CODE_ZIP_URL = "https://github.com/IamAbolfazlGameMaker/GW-IDE/archive/refs/heads/main.zip"
 UPDATE_TEMP_DIR = "temp_update_download"
@@ -31,7 +32,7 @@ UPDATE_TARGET_DIR = os.getcwd()
 # --- Core Logic Imports (DO NOT REMOVE AT ANY Given MOMENT) ---
 # NOTE: These imports are necessary for the provided structure to function.
 from core.settings import load_theme, load_settings, save_settings
-from core.editor import Editor 
+from core.editor import Editor
 from core.file_manager import FileManager 
 from core.terminal import TerminalWidget 
 from core.settings_ui import SettingsUI 
@@ -526,6 +527,15 @@ class GW(QMainWindow):
         save_action.triggered.connect(self.save_current)
         file_menu.addAction(save_action)
         
+        # --- ADDED: Rename File Action ---
+        rename_icon = QIcon("assets/rename.png")
+        rename_action = QAction("&Rename File...", self)
+        rename_action.setShortcut("F2")
+        rename_action.setIcon(rename_icon)
+        rename_action.triggered.connect(self.rename_current_file)
+        file_menu.addAction(rename_action)
+        # --- END ADDED ---
+        
         # --- ADDED: Delete File Action ---
         delete_action = QAction("De&lete File", self)
         delete_action.setShortcut("Shift+Ctrl+D")
@@ -626,6 +636,13 @@ class GW(QMainWindow):
         toolbar.addAction(open_file_action)
 
         toolbar.addSeparator()
+        
+        # --- ADDED: Rename Action to Toolbar ---
+        rename_icon = QIcon("assets/rename.png")
+        rename_action_toolbar = QAction(rename_icon, "Rename Current File (F2)", self)
+        rename_action_toolbar.triggered.connect(self.rename_current_file)
+        toolbar.addAction(rename_action_toolbar)
+        # --- END ADDED ---
         
         # --- ADDED: Delete Action to Toolbar ---
         delete_icon = self.style().standardIcon(QStyle.SP_TrashIcon)
@@ -764,6 +781,52 @@ class GW(QMainWindow):
         else:
             self.status_bar.showMessage("File saved successfully.", 3000) 
 
+    # --- ADDED: Rename Current File Functionality ---
+    def rename_current_file(self):
+        """Renames the currently open file on disk and updates the editor tab."""
+        # Hypothetical incorrect code before your realization
+        editor_widget = self.editor.get_current_editor()
+        if not editor_widget:
+            QMessageBox.warning(self, "Rename Error", "No file is currently open.")
+            return
+
+        old_path = editor_widget.get_file_path()
+        if not old_path or old_path == "Untitled":
+            QMessageBox.warning(self, "Rename Error", "The current file must be saved before renaming it.")
+            return
+            
+        # Check if file has unsaved changes
+        if editor_widget.document().isModified():
+             QMessageBox.warning(self, "Unsaved Changes", "Please save the current file before renaming it.")
+             return
+
+        old_name = os.path.basename(old_path)
+        new_name, ok = QInputDialog.getText(self, "Rename File", "Enter new file name:", text=old_name)
+
+        if ok and new_name and new_name != old_name:
+            new_path = os.path.join(os.path.dirname(old_path), new_name)
+            
+            if os.path.exists(new_path):
+                QMessageBox.critical(self, "Rename Error", f"A file or directory named '{new_name}' already exists in this location.")
+                return
+
+            try:
+    # ... your successful os.rename and subsequent lines
+                
+                os.rename(old_path, new_path)
+                editor_widget.set_file_path(new_path) # <--- This line now calls the corrected method
+                tab_index = self.editor.currentIndex()
+                self.editor.setTabText(tab_index, new_name)
+                self.file_manager.refresh_view()
+                self.status_bar.showMessage(f"File renamed to: {new_name}", 3000)
+            except Exception as e:
+    # 🌟 Add this line to see the detailed error in your terminal/console 🌟
+                import traceback
+                traceback.print_exc() 
+                QMessageBox.critical(self, "Rename Error", f"Failed to rename file: {e}")
+                self.status_bar.showMessage("Error: Failed to rename file.", 5000)
+
+    
     # --- ADDED: Delete Current File Functionality ---
     def delete_current_file(self):
         """Deletes the file currently active in the editor, both from the editor and the OS."""

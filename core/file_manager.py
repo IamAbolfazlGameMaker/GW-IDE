@@ -1,5 +1,10 @@
+# --- File: core/file_manager.py ---
+
 from PySide6.QtWidgets import QTreeView, QFileSystemModel
-from PySide6.QtCore import Signal, QDir
+from PySide6.QtCore import Signal, QDir, QModelIndex # Import QModelIndex for type hinting
+# ... other imports ...
+
+# Define Debug function (copied from your snippet for completeness)
 logger = "0"
 try:
     from addons.debug import *
@@ -7,14 +12,14 @@ try:
     logger = "1"
 except ModuleNotFoundError:
     print("Debug module NOT found. Defaulting to normal printing")
-# ------------------------------------------------------------------
-# 🎨 SYNTAX HIGHLIGHTING: COLOR SCHEME & FORMATS
-# ------------------------------------------------------------------
+
 def Debug(val):
     if logger == "1":
         log(val)
     else:
         print(val)
+# ------------------------------------
+
 class FileManager(QTreeView):
     file_open_requested = Signal(str)
 
@@ -22,23 +27,19 @@ class FileManager(QTreeView):
         super().__init__()
         self.model = QFileSystemModel()
         
-        # Start with the current working directory, which QDir.currentPath() provides
         default_path = QDir.currentPath()
         self.model.setRootPath(default_path)
         
         self.setModel(self.model)
-        
-        # Set the view's root index to the default path
         self.setRootIndex(self.model.index(default_path))
         
         self.doubleClicked.connect(self.on_double_click)
         
-        # Hide unnecessary columns (Size, Type, Date Modified)
         for i in range(1, self.model.columnCount()):
             self.setColumnHidden(i, True)
             
         self.setColumnWidth(0, 300) 
-        self.setHeaderHidden(True) # Hide the header for a cleaner look
+        self.setHeaderHidden(True)
 
     def on_double_click(self, index):
         if self.model.isDir(index):
@@ -47,13 +48,7 @@ class FileManager(QTreeView):
         file_path = self.model.filePath(index)
         self.file_open_requested.emit(file_path)
 
-    # 🆕 NEW FUNCTION: Sets the root directory for the file manager view
     def set_root_path(self, path):
-        """
-        Updates the QFileSystemModel to display the contents of the specified path.
-        This is called by the main application when 'Open Folder' is selected.
-        """
-        # Ensure the path exists before attempting to set it
         if QDir(path).exists():
             self.model.setRootPath(path)
             self.setRootIndex(self.model.index(path))
@@ -61,3 +56,22 @@ class FileManager(QTreeView):
         else:
             Debug(f"Error: Directory not found: {path}")
             return False
+
+    # ✅ CORRECTION 3: ADDING THE MISSING refresh_view METHOD
+    def refresh_view(self):
+
+        current_root_path = self.model.rootPath()
+        root_index = self.model.index(current_root_path)
+    
+    # 1. Ask the model to reload the contents of the root index.
+    # This is the correct PySide/Qt way to manually trigger an update 
+    # of the directory listing if auto-monitoring is delayed or missed.
+        self.model.setRootPath(current_root_path)
+    
+    # 2. Tell the view to re-display the contents starting from the root index.
+        self.setRootIndex(root_index)
+    
+    # 3. Force the view to repaint itself to guarantee the change is visible.
+        self.viewport().update()
+    
+        Debug("DEBUG: FileManager view updated via model reload.")
